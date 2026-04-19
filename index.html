@@ -3,84 +3,330 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2026 Next-Gen Fighter</title>
+    <title>Stickman Fighter Engine</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; }
-        canvas { display: block; filter: contrast(1.2) brightness(1.1); }
-        .ui { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; }
-        .btn { 
-            width: 80px; height: 80px; border-radius: 50%; 
-            background: rgba(255,255,255,0.1); border: 2px solid #007aff;
-            color: #007aff; font-weight: bold; pointer-events: auto;
-            backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center;
+        :root {
+            --bg: #121212;
+            --stick-color: #ffffff;
+            --accent-blue: #007aff;
+            --accent-red: #ff453a;
         }
+
+        /* 1. KÉRÉS: LETILTJUK A FRISSÍTÉST ÉS GÖLGETÉST */
+        html, body { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
+            overflow: hidden; /* Letiltja a görgetést */
+            overscroll-behavior: none; /* Letiltja a pull-to-refresh-t */
+            background: var(--bg); 
+            color: white; font-family: sans-serif; 
+            touch-action: none; /* Minden natív érintést átad a JS-nek */
+            -webkit-user-select: none; /* Letiltja a szövegkijelölést */
+        }
+
+        /* A "pálya" */
+        canvas { display: block; filter: drop-shadow(0 0 10px rgba(255,255,255,0.3)); }
+
+        /* UI RÉTEG */
+        .ui-layer {
+            position: fixed; inset: 0;
+            pointer-events: none; /* Átengedi az érintést az alatta lévő canvas-ra */
+            z-index: 100;
+        }
+
+        /* 3. KÉRÉS: KILÉPÉS GOMB (X) */
+        .exit-btn {
+            position: absolute; top: 20px; right: 20px;
+            width: 50px; height: 50px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid var(--accent-red);
+            border-radius: 12px;
+            color: var(--accent-red);
+            font-size: 30px; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: auto; /* Ez a gomb fogadja az érintést */
+            backdrop-filter: blur(5px);
+        }
+        .exit-btn:active { background: var(--accent-red); color: white; transform: scale(0.9); }
+
+        /* IRÁNYÍTÓK (MOBILRA) */
+        .controls {
+            position: absolute; bottom: 30px; width: 100%;
+            display: flex; justify-content: space-between;
+            padding: 0 30px; box-sizing: border-box;
+            pointer-events: none;
+        }
+        .btn-group { display: flex; gap: 15px; pointer-events: auto; }
+        .btn {
+            width: 70px; height: 70px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 50%; color: var(--accent-blue);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; font-weight: bold;
+            backdrop-filter: blur(3px);
+            user-select: none;
+        }
+        .btn:active { background: var(--accent-blue); color: white; border-color: transparent; }
+        .btn-atk { border-color: var(--accent-red); color: var(--accent-red); }
+        .btn-atk:active { background: var(--accent-red); color: white; }
     </style>
 </head>
 <body>
 
 <canvas id="gameCanvas"></canvas>
 
-<div class="ui">
-    <div class="btn" id="moveBtn">MOZGÁS</div>
-    <div class="btn" id="atkBtn" style="border-color: #ff453a; color: #ff453a;">ÜTÉS</div>
+<div class="ui-layer">
+    <div class="exit-btn" onclick="exitGame()">✕</div>
+
+    <div class="controls">
+        <div class="btn-group">
+            <div class="btn" id="btn-left">◀</div>
+            <div class="btn" id="btn-right">▶</div>
+        </div>
+        
+        <div class="btn-group">
+            <div class="btn" id="btn-crouch">▼</div> <div class="btn" id="btn-jump">▲</div>   <div class="btn btn-atk" id="btn-punch">P</div> <div class="btn btn-atk" id="btn-kick">K</div> </div>
+    </div>
 </div>
 
 <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
 
-    // 2026-os Procedurális Karakter Modell (Ízületek)
-    const character = {
+    // Canvas méretezése teljes képernyőre
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // JÁTÉK ÁLLAPOT ÉS FIZIKA
+    const floorY = canvas.height * 0.8;
+    
+    let fighter = {
         x: canvas.width / 2,
-        y: canvas.height - 150,
-        bones: {
-            head: { x: 0, y: -120 },
-            shoulder: { x: 0, y: -90 },
-            elbow: { x: 30, y: -60 },
-            hand: { x: 50, y: -40 }
-        },
-        time: 0,
-        isAttacking: false
+        y: floorY,
+        vx: 0,
+        vy: 0,
+        speed: 8,
+        gravity: 1.2,
+        jumpForce: -25,
+        
+        width: 120, // Virtuális szélesség a méretezéshez
+        height: 180, // A pálcikaember magassága
+
+        // Állapotok (State Machine)
+        state: 'idle', // idle, walking, jumping, crouch, punching, kicking
+        onGround: true,
+        direction: 1, // 1: Right, -1: Left
+        time: 0, // Animációs idő
     };
 
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Háttér fényeffekt (Neon)
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = '#007aff';
-        
-        character.time += 0.05;
-        
-        // Alap lélegző animáció (matematikailag számolva)
-        let breathing = Math.sin(character.time) * 5;
-        
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 8;
-        ctx.lineCap = 'round';
+    // BEMENETI ÁLLAPOTOK
+    let inputs = { left: false, right: false };
 
-        ctx.beginPath();
-        // Gerinc rajzolása
-        ctx.moveTo(character.x, character.y);
-        ctx.lineTo(character.x, character.y + character.bones.shoulder.y + breathing);
-        
-        // Kar rajzolása (Ütés logika)
-        let punchX = character.isAttacking ? 100 : character.bones.hand.x;
-        ctx.lineTo(character.x + punchX, character.y + character.bones.shoulder.y + breathing);
-        
-        ctx.stroke();
+    // MOBIL IRÁNYÍTÓK BEÁLLÍTÁSA
+    setupBtn('btn-left', 'left');
+    setupBtn('btn-right', 'right');
+    
+    setupActionBtn('btn-jump', jump);
+    setupActionBtn('btn-crouch', crouchStart, crouchEnd);
+    setupActionBtn('btn-punch', punch);
+    setupActionBtn('btn-kick', kick);
 
-        requestAnimationFrame(draw);
+    function setupBtn(id, inputKey) {
+        const b = document.getElementById(id);
+        b.addEventListener('pointerdown', () => { inputs[inputKey] = true; fighter.direction = (inputKey==='right') ? 1 : -1; });
+        b.addEventListener('pointerup', () => inputs[inputKey] = false);
+        b.addEventListener('pointerout', () => inputs[inputKey] = false);
     }
 
-    document.getElementById('atkBtn').addEventListener('pointerdown', () => {
-        character.isAttacking = true;
-        setTimeout(() => character.isAttacking = false, 150);
-    });
+    function setupActionBtn(id, startFn, endFn) {
+        const b = document.getElementById(id);
+        b.addEventListener('pointerdown', startFn);
+        if(endFn) b.addEventListener('pointerup', endFn);
+    }
 
-    draw();
+    // AKCIÓ FUNKCIÓK
+    function jump() {
+        if(fighter.onGround && fighter.state !== 'crouch') {
+            fighter.vy = fighter.jumpForce;
+            fighter.onGround = false;
+            fighter.state = 'jumping';
+        }
+    }
+
+    function crouchStart() { if(fighter.onGround) fighter.state = 'crouch'; }
+    function crouchEnd() { if(fighter.state === 'crouch') fighter.state = 'idle'; }
+
+    function punch() { triggerAttack('punching'); }
+    function kick() { triggerAttack('kicking'); }
+
+    function triggerAttack(atkState) {
+        if(fighter.state === 'idle' || fighter.state === 'walking') {
+            fighter.state = atkState;
+            setTimeout(() => { if(fighter.state === atkState) fighter.state = 'idle'; }, 200);
+        }
+    }
+
+    function exitGame() {
+        if(confirm("Biztosan ki akarsz lépni?")) {
+            // PWA környezetben bezárja az appot, böngészőben visszalép
+            window.close();
+            if(window.history.length > 1) window.history.back();
+            else window.location.href = "about:blank"; // Fallback
+        }
+    }
+
+    // PÁLCIKAEMBER RAJZOLÓ MOTOR (MATEMATIKAI MODEL)
+    function drawStickman(ctx, x, y, f) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 10;
+        ctx.lineCap = 'round';
+        ctx.fillStyle = '#fff'; // A fejhez
+
+        // Alap magasság és méret
+        let h = f.height;
+        if(f.state === 'crouch') h *= 0.6; // Guggolásnál összemegy
+
+        // Lélegző mozgás (sinus görbe)
+        f.time += 0.05;
+        let breathe = (f.state==='idle') ? Math.sin(f.time) * 4 : 0;
+        let walkCycle = (f.state==='walking') ? Math.sin(f.time * 2) * 20 : 0;
+
+        // FŐ PONTOK KISZÁMÍTÁSA
+        let hip = { x: x, y: y - (h * 0.4) };
+        let neck = { x: x + walkCycle/2 * f.direction, y: y - h - breathe };
+        
+        // 1. Törzs és Fej
+        ctx.beginPath();
+        ctx.moveTo(hip.x, hip.y);
+        ctx.lineTo(neck.x, neck.y);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(neck.x, neck.y - 25, 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Lábak (IK logika alapján)
+        let legAngleL, legAngleR;
+        if(f.state === 'walking') {
+            legAngleL = Math.sin(f.time * 2) * 30 * f.direction;
+            legAngleR = Math.sin(f.time * 2 + Math.PI) * 30 * f.direction;
+        } else if(f.state === 'crouch') {
+            legAngleL = 60 * f.direction; legAngleR = 60 * f.direction;
+        } else if (f.state === 'jumping') {
+            legAngleL = 10 * f.direction; legAngleR = 30 * f.direction;
+        } else if (f.state === 'kicking') {
+            legAngleL = -80 * f.direction; legAngleR = 20 * f.direction;
+        } else { // Idle
+            legAngleL = 15; legAngleR = -15;
+        }
+
+        drawLimb(ctx, hip, 70, legAngleL, true); // Bal láb
+        drawLimb(ctx, hip, 70, legAngleR, true); // Jobb láb
+
+        // 3. Karok
+        let shoulder = { x: neck.x, y: neck.y + 20 };
+        let armAngleL, armAngleR;
+
+        if(f.state === 'punching') {
+            armAngleL = -80 * f.direction; armAngleR = 10 * f.direction;
+        } else if(f.state === 'walking') {
+            armAngleL = Math.sin(f.time * 2 + Math.PI) * 20 * f.direction;
+            armAngleR = Math.sin(f.time * 2) * 20 * f.direction;
+        } else if(f.state === 'crouch') {
+            armAngleL = 15; armAngleR = -15;
+        } else { // Idle / Jumping
+            armAngleL = 20; armAngleR = -20;
+        }
+
+        drawLimb(ctx, shoulder, 60, armAngleL); // Bal kar
+        drawLimb(ctx, shoulder, 60, armAngleR); // Jobb kar
+    }
+
+    // Segédfunkció egy végtag rajzolásához (ízület és hajlás)
+    function drawLimb(ctx, startPoint, length, angleDegree, isLeg = false) {
+        let angleRad = angleDegree * (Math.PI / 180);
+        let joint = {
+            x: startPoint.x + Math.sin(angleRad) * (length * 0.5),
+            y: startPoint.y + Math.cos(angleRad) * (length * 0.5)
+        };
+        
+        // Ha guggol vagy ugrik, jobban behajlik az ízület (lábnál)
+        let bendAngle = (isLeg && (fighter.state === 'crouch' || fighter.state === 'jumping')) ? Math.PI/2 : Math.PI/8;
+        
+        let end = {
+            x: joint.x + Math.sin(angleRad + bendAngle) * (length * 0.5),
+            y: joint.y + Math.cos(angleRad + bendAngle) * (length * 0.5)
+        };
+
+        ctx.beginPath();
+        ctx.moveTo(startPoint.x, startPoint.y);
+        ctx.lineTo(joint.x, joint.y); // Felső rész
+        ctx.lineTo(end.x, end.y); // Alsó rész
+        ctx.stroke();
+    }
+
+    // JÁTÉKCIKLUS (FIZIKA ÉS RAJZOLÁS)
+    function gameLoop() {
+        // 1. Fizikai számítások
+        if (inputs.left) fighter.vx = -fighter.speed;
+        else if (inputs.right) fighter.vx = fighter.speed;
+        else fighter.vx *= 0.8; // Súrlódás
+
+        // Ne fusson guggolva/ütve/rúgva
+        if(fighter.state === 'crouch' || fighter.state === 'punching' || fighter.state === 'kicking') fighter.vx = 0;
+
+        fighter.x += fighter.vx;
+        
+        // Gravitáció és Ugrás
+        if(!fighter.onGround) {
+            fighter.vy += fighter.gravity;
+            fighter.y += fighter.vy;
+            
+            // Földet érés ellenőrzése
+            if(fighter.y >= floorY) {
+                fighter.y = floorY;
+                fighter.vy = 0;
+                fighter.onGround = true;
+                if(fighter.state === 'jumping') fighter.state = 'idle';
+            }
+        }
+
+        // Határok (ne menjen ki a képernyőről)
+        if(fighter.x < 50) fighter.x = 50;
+        if(fighter.x > canvas.width - 50) fighter.x = canvas.width - 50;
+
+        // Állapot automatikus frissítése
+        if(fighter.onGround) {
+            if(fighter.state !== 'crouch' && fighter.state !== 'punching' && fighter.state !== 'kicking') {
+                if (Math.abs(fighter.vx) > 0.5) fighter.state = 'walking';
+                else fighter.state = 'idle';
+            }
+        }
+
+        // 2. Rajzolás
+        // Háttér törlése
+        ctx.fillStyle = '#121212';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Padló vonal
+        ctx.strokeStyle = '#333';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, floorY); ctx.lineTo(canvas.width, floorY);
+        ctx.stroke();
+
+        // Pálcikaember rajzolása
+        drawStickman(ctx, fighter.x, fighter.y, fighter);
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // Játék indítása
+    gameLoop();
 </script>
 </body>
 </html>
