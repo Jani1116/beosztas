@@ -3,186 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Modern Fighter Pro</title>
+    <title>2026 Next-Gen Fighter</title>
     <style>
-        :root {
-            --bg: #0a0a0a;
-            --accent: #ff453a;
-        }
-        body { 
-            margin: 0; background: var(--bg); color: white; 
-            font-family: system-ui; overflow: hidden; touch-action: none; 
-        }
-        
-        /* Pálya és háttér */
-        #stage {
-            position: relative;
-            width: 100vw; height: 100vh;
-            background: linear-gradient(to bottom, #1a1a2e 0%, #16213e 100%);
-            display: flex; align-items: flex-end; justify-content: center;
-        }
-
-        /* Padló fényeffekt */
-        #floor {
-            position: absolute; bottom: 15vh;
-            width: 150%; height: 2px;
-            background: var(--accent);
-            box-shadow: 0 0 20px var(--accent);
-        }
-
-        /* Modern Karakter Konténer */
-        #player {
-            position: absolute;
-            width: 120px; height: 180px;
-            bottom: 15vh; transform-origin: bottom center;
-            transition: filter 0.1s;
-            z-index: 10;
-        }
-
-        /* Karakter "teste" - ide jönne a HD sprite */
-        .character-body {
-            width: 100%; height: 100%;
-            background: #444; /* Ideiglenes szín */
-            border-radius: 20px;
-            box-shadow: inset 0 0 30px rgba(0,0,0,0.5);
-            border: 2px solid rgba(255,255,255,0.1);
-        }
-
-        /* Dinamikus árnyék */
-        .shadow {
-            position: absolute;
-            bottom: -10px; left: 10%;
-            width: 80%; height: 20px;
-            background: rgba(0,0,0,0.6);
-            filter: blur(8px);
-            border-radius: 50%;
-            z-index: -1;
-        }
-
-        /* Irányító gombok */
-        .ui-layer {
-            position: fixed; inset: 0;
-            display: flex; flex-direction: column; justify-content: flex-end;
-            padding: 30px; pointer-events: none;
-        }
-        .controls { display: flex; gap: 20px; pointer-events: auto; }
-        .btn {
-            width: 70px; height: 70px;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 50%; color: white;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 24px; backdrop-filter: blur(5px);
-        }
-        .btn:active { background: var(--accent); transform: scale(0.9); }
-
-        /* Effekt: Képernyőrázkódás */
-        .shake { animation: shake 0.2s ease-in-out; }
-        @keyframes shake {
-            0%, 100% { transform: translate(0,0); }
-            25% { transform: translate(-5px, 5px); }
-            50% { transform: translate(5px, -5px); }
-            75% { transform: translate(-5px, -5px); }
+        body { margin: 0; background: #000; overflow: hidden; }
+        canvas { display: block; filter: contrast(1.2) brightness(1.1); }
+        .ui { position: fixed; bottom: 20px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; }
+        .btn { 
+            width: 80px; height: 80px; border-radius: 50%; 
+            background: rgba(255,255,255,0.1); border: 2px solid #007aff;
+            color: #007aff; font-weight: bold; pointer-events: auto;
+            backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center;
         }
     </style>
 </head>
 <body>
 
-<div id="stage">
-    <div id="floor"></div>
-    <div id="player">
-        <div class="character-body"></div>
-        <div class="shadow"></div>
-    </div>
-</div>
+<canvas id="gameCanvas"></canvas>
 
-<div class="ui-layer">
-    <div class="controls">
-        <button class="btn" id="btn-left">◀</button>
-        <button class="btn" id="btn-right">▶</button>
-        <div style="flex-grow: 1;"></div>
-        <button class="btn" id="btn-atk" style="background: var(--accent);">👊</button>
-    </div>
+<div class="ui">
+    <div class="btn" id="moveBtn">MOZGÁS</div>
+    <div class="btn" id="atkBtn" style="border-color: #ff453a; color: #ff453a;">ÜTÉS</div>
 </div>
 
 <script>
-    const playerEl = document.getElementById('player');
-    const stage = document.getElementById('stage');
-    
-    // FIZIKAI MOTOR ADATAI
-    let p = {
-        x: window.innerWidth / 2 - 60,
-        vx: 0,              // Sebesség
-        acc: 1.5,           // Gyorsulás
-        friction: 0.85,     // Súrlódás (tehetetlenség)
-        width: 120,
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // 2026-os Procedurális Karakter Modell (Ízületek)
+    const character = {
+        x: canvas.width / 2,
+        y: canvas.height - 150,
+        bones: {
+            head: { x: 0, y: -120 },
+            shoulder: { x: 0, y: -90 },
+            elbow: { x: 30, y: -60 },
+            hand: { x: 50, y: -40 }
+        },
+        time: 0,
         isAttacking: false
     };
 
-    let inputs = { left: false, right: false };
-
-    // IRÁNYÍTÁS (Egér/Érintés)
-    setupBtn('btn-left', 'left');
-    setupBtn('btn-right', 'right');
-    document.getElementById('btn-atk').addEventListener('pointerdown', attack);
-
-    function setupBtn(id, dir) {
-        const b = document.getElementById(id);
-        b.addEventListener('pointerdown', () => inputs[dir] = true);
-        b.addEventListener('pointerup', () => inputs[dir] = false);
-        b.addEventListener('pointerout', () => inputs[dir] = false);
-    }
-
-    // TÁMADÁS LOGIKA (2020-as effektusokkal)
-    function attack() {
-        if(p.isAttacking) return;
-        p.isAttacking = true;
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Vizuális visszacsatolás (Juice)
-        playerEl.style.transform = "scale(1.2) skewX(-10deg)";
-        playerEl.style.filter = "brightness(2) contrast(1.5)";
-        stage.classList.add('shake');
+        // Háttér fényeffekt (Neon)
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = '#007aff';
+        
+        character.time += 0.05;
+        
+        // Alap lélegző animáció (matematikailag számolva)
+        let breathing = Math.sin(character.time) * 5;
+        
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 8;
+        ctx.lineCap = 'round';
 
-        setTimeout(() => {
-            playerEl.style.transform = "scale(1) skewX(0)";
-            playerEl.style.filter = "none";
-            stage.classList.remove('shake');
-            p.isAttacking = false;
-        }, 200);
+        ctx.beginPath();
+        // Gerinc rajzolása
+        ctx.moveTo(character.x, character.y);
+        ctx.lineTo(character.x, character.y + character.bones.shoulder.y + breathing);
+        
+        // Kar rajzolása (Ütés logika)
+        let punchX = character.isAttacking ? 100 : character.bones.hand.x;
+        ctx.lineTo(character.x + punchX, character.y + character.bones.shoulder.y + breathing);
+        
+        ctx.stroke();
+
+        requestAnimationFrame(draw);
     }
 
-    // JÁTÉKCIKLUS (60+ FPS)
-    function update() {
-        // Gyorsulás
-        if (inputs.left) p.vx -= p.acc;
-        if (inputs.right) p.vx += p.acc;
+    document.getElementById('atkBtn').addEventListener('pointerdown', () => {
+        character.isAttacking = true;
+        setTimeout(() => character.isAttacking = false, 150);
+    });
 
-        // Súrlódás (Ettől lesz "selymes" a mozgás)
-        p.vx *= p.friction;
-
-        // Pozíció frissítése
-        p.x += p.vx;
-
-        // Határok ellenőrzése
-        if (p.x < 0) { p.x = 0; p.vx = 0; }
-        if (p.x > window.innerWidth - p.width) { p.x = window.innerWidth - p.width; p.vx = 0; }
-
-        // MEGJELENÍTÉS FRISSÍTÉSE
-        // Dinamikus dőlés a sebesség függvényében (2020-as stílus)
-        let tilt = p.vx * 0.8; 
-        // Mozgási elmosódás (Motion Blur)
-        let blur = Math.abs(p.vx) * 0.5;
-
-        playerEl.style.left = p.x + 'px';
-        if(!p.isAttacking) {
-            playerEl.style.transform = `skewX(${tilt}deg)`;
-            playerEl.style.filter = `blur(${blur}px)`;
-        }
-
-        requestAnimationFrame(update);
-    }
-
-    requestAnimationFrame(update);
+    draw();
 </script>
 </body>
 </html>
