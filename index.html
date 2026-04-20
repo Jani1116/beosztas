@@ -3,33 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Stickman Kombat Fix</title>
+    <title>Stickman Pro Kombat - Boxer Edition</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        body { margin: 0; background: #050505; overflow: hidden; touch-action: none; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
         
-        /* HP SÁVOK */
-        .bars { position: fixed; top: 20px; width: 100%; display: flex; justify-content: space-evenly; pointer-events: none; }
-        .hp-cont { width: 40%; height: 20px; background: #333; border: 2px solid #fff; border-radius: 5px; }
-        .hp-fill { height: 100%; background: #f00; width: 100%; transition: width 0.2s; }
+        .bars { position: fixed; top: 25px; width: 100%; display: flex; justify-content: space-evenly; pointer-events: none; }
+        .hp-cont { width: 42%; height: 24px; background: rgba(255,255,255,0.1); border: 2px solid #eee; border-radius: 4px; overflow: hidden; }
+        .hp-fill { height: 100%; background: linear-gradient(90deg, #ff3b30, #ff9500); width: 100%; transition: width 0.3s; }
 
-        /* JOYSTICK */
-        #joy-zone { 
-            position: fixed; bottom: 40px; left: 40px; width: 150px; height: 150px; 
-            background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid #555;
-        }
-        #knob { 
-            position: absolute; width: 60px; height: 60px; background: #007aff; 
-            border-radius: 50%; left: 45px; top: 45px; pointer-events: none;
-        }
+        #joy-zone { position: fixed; bottom: 45px; left: 45px; width: 140px; height: 140px; background: rgba(255,255,255,0.05); border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); }
+        #knob { position: absolute; width: 55px; height: 55px; background: #007aff; border-radius: 50%; left: 42.5px; top: 42.5px; box-shadow: 0 0 15px rgba(0,122,255,0.5); }
         
-        /* GOMBOK - Tágasabb elrendezés */
-        .btns { position: fixed; bottom: 40px; right: 40px; display: grid; grid-template-columns: 90px 90px; gap: 20px; }
-        .b { 
-            width: 85px; height: 85px; border-radius: 50%; border: 4px solid #fff; 
-            color: #fff; display: flex; align-items: center; justify-content: center; 
-            font-weight: bold; background: rgba(0,0,0,0.7); font-size: 20px;
-        }
+        .btns { position: fixed; bottom: 45px; right: 45px; display: grid; grid-template-columns: 85px 85px; gap: 18px; }
+        .b { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #fff; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; background: rgba(255,255,255,0.1); font-size: 18px; backdrop-filter: blur(5px); }
         #b-hp { border-color: #ff3b30; } #b-lp { border-color: #007aff; }
         #b-hk { border-color: #ffcc00; } #b-lk { border-color: #30d158; }
     </style>
@@ -57,7 +44,7 @@ canvas.height = window.innerHeight;
 
 const floor = canvas.height * 0.8;
 
-class Fighter {
+class BoxerFighter {
     constructor(x, color, side) {
         this.x = x; this.y = floor;
         this.vx = 0; this.vy = 0;
@@ -68,95 +55,128 @@ class Fighter {
         this.animFrame = 0;
         this.onGround = true;
         this.rot = 0;
+        this.flipDir = 0;
     }
 
     update(opp) {
-        this.vy += 1.5;
+        this.vy += 1.4; // Gravity
         this.x += this.vx;
         this.y += this.vy;
-        this.vx *= 0.85;
+        this.vx *= 0.88;
 
         if (this.y >= floor) {
             this.y = floor;
             this.vy = 0;
             this.onGround = true;
             this.rot = 0;
+            this.flipDir = 0;
         }
 
-        if (this.onGround && this.state !== 'HIT') {
+        if (this.onGround) {
             this.side = this.x < opp.x ? 1 : -1;
-        }
-
-        if (!this.onGround && Math.abs(this.vx) > 2) {
-            this.rot += 0.2 * Math.sign(this.vx);
-        }
-
-        if (this.state !== 'IDLE' && this.state !== 'WALK') {
-            this.animFrame++;
-            if (this.animFrame > 12) this.state = 'IDLE';
+            if (this.state !== 'IDLE' && this.state !== 'WALK') {
+                this.animFrame++;
+                if (this.animFrame > 10) this.state = 'IDLE';
+            }
+        } else {
+            // Szaltó logika: ha van vízszintes sebesség, forogjon
+            if (Math.abs(this.vx) > 2) {
+                this.flipDir = Math.sign(this.vx);
+                this.rot += 0.25 * this.flipDir;
+            }
         }
     }
 
     draw() {
         ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.rot);
-        ctx.scale(this.side, 1);
         
+        // Ha levegőben van, a forgáspontot a fej fölé helyezzük
+        if (!this.onGround) {
+            ctx.translate(this.x, this.y - 100); 
+            ctx.rotate(this.rot);
+            ctx.translate(0, 100); 
+        } else {
+            ctx.translate(this.x, this.y);
+        }
+        
+        ctx.scale(this.side, 1);
         ctx.strokeStyle = this.color;
-        ctx.lineWidth = 8;
+        ctx.fillStyle = this.color;
+        ctx.lineWidth = 7;
         ctx.lineCap = 'round';
 
-        let walk = (this.state === 'WALK') ? Math.sin(Date.now() * 0.012) * 25 : 0;
-        let bodyY = -140;
-        let hipY = -70;
+        let walk = (this.state === 'WALK') ? Math.sin(Date.now() * 0.015) * 20 : 0;
+        let bodyY = -135;
+        let hipY = -75;
 
-        // Törzs és fej
-        ctx.beginPath(); ctx.moveTo(0, hipY); ctx.lineTo(0, bodyY); ctx.stroke();
-        ctx.beginPath(); ctx.arc(0, bodyY-20, 15, 0, Math.PI*2); ctx.stroke();
+        // Törzs (kicsit görnyedve, mint a rajzon)
+        ctx.beginPath(); 
+        ctx.moveTo(0, hipY); 
+        ctx.lineTo(-5, bodyY); 
+        ctx.stroke();
 
-        // Lábak - Szimmetrikus mozgás
-        this.drawLimb(0, hipY, walk, 0, true);
-        this.drawLimb(0, hipY, -walk, 0, true);
+        // Fej
+        ctx.beginPath(); 
+        ctx.arc(-5, bodyY - 22, 18, 0, Math.PI * 2); 
+        ctx.stroke();
 
-        // Karok - Harci póz vagy ütés
-        let lArm = 20, rArm = -20, armY = 20;
-        if (this.state === 'LP') lArm = 70;
-        if (this.state === 'HP') lArm = 90;
-        if (this.state === 'LK') { walk = 60; }
-        if (this.state === 'HK') { walk = 80; }
+        // Lábak (széles terpesz a rajzod alapján)
+        this.drawLeg(0, hipY, walk + 15, 0);
+        this.drawLeg(0, hipY, -walk - 25, 0);
 
-        this.drawLimb(0, bodyY + 30, lArm, armY, false);
-        this.drawLimb(0, bodyY + 30, rArm, armY, false);
+        // Karok és Kesztyűk
+        this.drawArm(-5, bodyY + 30, this.state === 'LP' ? 75 : 25, -10, true);
+        this.drawArm(-5, bodyY + 30, this.state === 'HP' ? 85 : 35, 10, false);
 
         ctx.restore();
     }
 
-    drawLimb(sx, sy, tx, ty, isLeg) {
-        let bend = isLeg ? 15 : -10;
+    drawLeg(sx, sy, tx, ty) {
         ctx.beginPath();
         ctx.moveTo(sx, sy);
-        ctx.lineTo(tx/2 + bend, sy + 35);
-        ctx.lineTo(tx, sy + 70 + ty);
+        ctx.lineTo(tx / 2 + 10, sy + 35);
+        ctx.lineTo(tx, sy + 75 + ty);
         ctx.stroke();
+        // Lábfej
+        ctx.beginPath();
+        ctx.moveTo(tx, sy + 75 + ty);
+        ctx.lineTo(tx + 12, sy + 75 + ty);
+        ctx.stroke();
+    }
+
+    drawArm(sx, sy, tx, ty, front) {
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        let elbowX = tx / 2 + (front ? 15 : -10);
+        let elbowY = sy + 15;
+        ctx.lineTo(elbowX, elbowY);
+        let fistX = tx;
+        let fistY = sy + ty;
+        ctx.lineTo(fistX, fistY);
+        ctx.stroke();
+
+        // BOXKESZTYŰ (a rajzod alapján)
+        ctx.beginPath();
+        ctx.arc(fistX, fistY, 12, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 
-const p1 = new Fighter(canvas.width * 0.25, '#fff', 1);
-const p2 = new Fighter(canvas.width * 0.75, '#ff3b30', -1);
+const p1 = new BoxerFighter(canvas.width * 0.25, '#ffffff', 1);
+const p2 = new BoxerFighter(canvas.width * 0.75, '#ff3b30', -1);
 
-// IRÁNYÍTÁS JAVÍTÁSA
+// IRÁNYÍTÁS
 let joy = { x: 0, y: 0, active: false };
 const zone = document.getElementById('joy-zone');
 const knob = document.getElementById('knob');
 
-zone.addEventListener('touchstart', (e) => { joy.active = true; });
+zone.addEventListener('touchstart', (e) => { joy.active = true; e.preventDefault(); });
 window.addEventListener('touchmove', (e) => {
     if (!joy.active) return;
     let t = e.touches[0];
     let r = zone.getBoundingClientRect();
-    let dx = t.clientX - (r.left + 75);
-    let dy = t.clientY - (r.top + 75);
+    let dx = t.clientX - (r.left + r.width/2);
+    let dy = t.clientY - (r.top + r.height/2);
     let d = Math.min(50, Math.sqrt(dx*dx + dy*dy));
     let ang = Math.atan2(dy, dx);
     joy.x = Math.cos(ang) * d;
@@ -169,46 +189,48 @@ window.addEventListener('touchend', () => {
 });
 
 function attack(p, type, dmg) {
-    if (p.state !== 'IDLE' && p.state !== 'WALK') return;
+    if (!p.onGround || (p.state !== 'IDLE' && p.state !== 'WALK')) return;
     p.state = type; p.animFrame = 0;
     let opp = (p === p1) ? p2 : p1;
-    if (Math.abs(p.x - opp.x) < 120) {
+    if (Math.abs(p.x - opp.x) < 130) {
         opp.hp -= dmg;
-        opp.vx = p.side * 15;
-        document.getElementById((p === p1 ? 'p2' : 'p1') + '-hp').style.width = opp.hp + '%';
+        opp.vx = p.side * 12;
+        document.getElementById((p === p1 ? 'p2' : 'p1') + '-hp').style.width = Math.max(0, opp.hp) + '%';
     }
 }
 
-// GOMBOK ESEMÉNYKEZELŐI
 const bindBtn = (id, type, dmg) => {
     document.getElementById(id).addEventListener('touchstart', (e) => {
         e.preventDefault();
         attack(p1, type, dmg);
     });
 };
-bindBtn('b-lp', 'LP', 5); bindBtn('b-hp', 'HP', 10);
-bindBtn('b-lk', 'LK', 7); bindBtn('b-hk', 'HK', 12);
+bindBtn('b-lp', 'LP', 6); bindBtn('b-hp', 'HP', 12);
+bindBtn('b-lk', 'LK', 8); bindBtn('b-hk', 'HK', 15);
 
 function loop() {
-    ctx.fillStyle = '#111';
+    ctx.fillStyle = '#050505';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Mozgás
+    // P1 Irányítás
     if (joy.active) {
-        if (Math.abs(joy.x) > 10) {
-            p1.vx = (joy.x/50) * 8;
+        if (Math.abs(joy.x) > 8) {
+            p1.vx = (joy.x/50) * 8.5;
             if (p1.onGround) p1.state = 'WALK';
         }
-        if (joy.y < -30 && p1.onGround) { p1.vy = -25; p1.onGround = false; }
+        if (joy.y < -25 && p1.onGround) { 
+            p1.vy = -26; 
+            p1.onGround = false; 
+        }
     } else if (p1.onGround && p1.state === 'WALK') {
         p1.state = 'IDLE';
     }
 
-    // AI
+    // Shadow AI
     let dist = p1.x - p2.x;
     if (p2.hp > 0) {
-        if (Math.abs(dist) > 130) p2.vx = Math.sign(dist) * 3.5;
-        if (Math.abs(dist) < 110 && Math.random() < 0.04) attack(p2, 'LP', 2);
+        if (Math.abs(dist) > 140) p2.vx = Math.sign(dist) * 3;
+        if (Math.abs(dist) < 120 && Math.random() < 0.05) attack(p2, 'LP', 3);
     }
 
     p1.update(p2); p2.update(p1);
