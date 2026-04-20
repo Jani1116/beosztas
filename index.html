@@ -3,70 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2026 Stickman Pro - Acrobatics</title>
+    <title>Stickman Pro - Combat Edition</title>
     <style>
         body { 
-            margin: 0; background: #050505; overflow: hidden; 
-            touch-action: none; overscroll-behavior: none;
-            font-family: sans-serif;
+            margin: 0; background: #0a0a0a; overflow: hidden; 
+            touch-action: none; font-family: 'Segoe UI', sans-serif;
         }
         canvas { display: block; }
 
-        /* KILÉPÉS GOMB */
+        /* UI ELEMEK */
+        .ui-layer { position: fixed; top: 20px; left: 0; width: 100%; pointer-events: none; }
+        .health-bar-cont { 
+            width: 300px; height: 20px; background: rgba(255,255,255,0.1); 
+            margin: 10px auto; border: 2px solid #fff; border-radius: 10px; overflow: hidden;
+        }
+        #hp-player { width: 100%; height: 100%; background: #30d158; transition: 0.2s; }
+        #hp-enemy { width: 100%; height: 100%; background: #ff3b30; transition: 0.2s; }
+
         #exit-btn {
-            position: fixed; top: 20px; right: 20px;
-            width: 50px; height: 50px; background: rgba(255, 0, 0, 0.2);
-            border: 2px solid #ff453a; border-radius: 12px;
-            color: #ff453a; display: flex; align-items: center; justify-content: center;
-            font-size: 24px; font-weight: bold; z-index: 1000; pointer-events: auto;
+            position: fixed; top: 20px; right: 20px; width: 45px; height: 45px;
+            background: rgba(255, 69, 58, 0.2); border: 2px solid #ff453a;
+            border-radius: 10px; color: #ff453a; display: flex; align-items: center;
+            justify-content: center; font-weight: bold; pointer-events: auto;
         }
 
-        /* JOYSTICK */
+        /* IRÁNYÍTÁS */
         #joy-base {
-            position: fixed; bottom: 40px; left: 40px;
-            width: 140px; height: 140px; background: rgba(255,255,255,0.05);
-            border: 2px solid rgba(255,255,255,0.1); border-radius: 50%;
+            position: fixed; bottom: 50px; left: 50px; width: 130px; height: 130px;
+            background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.2); border-radius: 50%;
         }
         #joy-knob {
-            position: absolute; top: 40px; left: 40px;
-            width: 60px; height: 60px; background: #007aff;
-            border-radius: 50%; box-shadow: 0 0 20px #007aff;
+            position: absolute; top: 35px; left: 35px; width: 60px; height: 60px;
+            background: #007aff; border-radius: 50%; box-shadow: 0 0 15px #007aff;
         }
 
-        /* AKCIÓ GOMBOK */
-        .btn-panel {
-            position: fixed; bottom: 40px; right: 40px;
-            width: 200px; height: 200px;
-        }
+        .btn-panel { position: fixed; bottom: 50px; right: 50px; width: 200px; height: 200px; }
         .btn {
-            position: absolute; width: 65px; height: 65px;
-            border: 2px solid #fff; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: bold; color: white; background: rgba(255,255,255,0.1);
+            position: absolute; width: 70px; height: 70px; border: 3px solid #fff;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: bold; color: white; background: rgba(0,0,0,0.5); pointer-events: auto;
         }
-        /* Elrendezés */
-        #btn-B { top: 0; left: 67px; border-color: #ffcc00; }    /* Nagy Ütés */
-        #btn-D { bottom: 0; left: 67px; border-color: #30d158; } /* Kis Rúgás */
-        #btn-A { top: 67px; left: 0; border-color: #007aff; }    /* Kis Ütés */
-        #btn-C { top: 67px; right: 0; border-color: #ff3b30; }   /* Nagy Ütés */
-        
-        .btn:active { transform: scale(0.9); background: white; color: black; }
+        #btn-B { top: 0; left: 65px; border-color: #ffcc00; } 
+        #btn-D { bottom: 0; left: 65px; border-color: #30d158; } 
+        #btn-A { top: 65px; left: 0; border-color: #007aff; } 
+        #btn-C { top: 65px; right: 0; border-color: #ff3b30; }
     </style>
 </head>
 <body>
 
-<div id="exit-btn">✕</div>
+<div id="exit-btn" onclick="location.reload()">✕</div>
 
-<div id="joy-base">
-    <div id="joy-knob"></div>
+<div class="ui-layer">
+    <div style="text-align: center; color: white; font-size: 12px;">PLAYER</div>
+    <div class="health-bar-cont"><div id="hp-player"></div></div>
+    <div style="text-align: center; color: white; font-size: 12px;">ENEMY</div>
+    <div class="health-bar-cont"><div id="hp-enemy"></div></div>
 </div>
+
+<div id="joy-base"><div id="joy-knob"></div></div>
 
 <div class="btn-panel">
-    <div class="btn" id="btn-B">B</div>
-    <div class="btn" id="btn-D">D</div>
-    <div class="btn" id="btn-A">A</div>
-    <div class="btn" id="btn-C">C</div>
-</div>
+    <div class="btn" id="btn-B">H</div> <div class="btn" id="btn-D">L</div> <div class="btn" id="btn-A">M</div> <div class="btn" id="btn-C">S</div> </div>
 
 <canvas id="c"></canvas>
 
@@ -77,117 +74,187 @@
     canvas.height = window.innerHeight;
 
     const floorY = canvas.height * 0.75;
-    let f = {
-        x: canvas.width * 0.3, y: floorY,
-        vx: 0, vy: 0, rot: 0,
-        dir: 1, state: 'idle',
-        onGround: true, time: 0
-    };
+    let shake = 0;
+    let particles = [];
 
-    // JOYSTICK KEZELÉS
-    let j = { active: false, x: 0, y: 0 };
+    class Stickman {
+        constructor(x, color, isPlayer) {
+            this.x = x; this.y = floorY;
+            this.vx = 0; this.vy = 0;
+            this.color = color;
+            this.isPlayer = isPlayer;
+            this.hp = 100;
+            this.state = 'idle';
+            this.dir = isPlayer ? 1 : -1;
+            this.rot = 0;
+            this.onGround = true;
+            this.time = 0;
+        }
+
+        update() {
+            this.vy += 1.2; // Gravity
+            this.x += this.vx;
+            this.y += this.vy;
+
+            if(this.y >= floorY) {
+                this.y = floorY;
+                this.vy = 0;
+                this.onGround = true;
+                if(Math.abs(this.vx) < 0.5) this.rot = 0;
+            }
+
+            if(!this.onGround && Math.abs(this.vx) > 2) {
+                this.rot += 0.2 * Math.sign(this.vx);
+            }
+
+            this.time += 0.15;
+            this.vx *= 0.9; // Friction
+        }
+
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y - (this.state==='crouch'? 40 : 0));
+            ctx.rotate(this.rot);
+            ctx.scale(this.dir, 1);
+            ctx.strokeStyle = this.hp > 0 ? this.color : '#444';
+            ctx.lineWidth = 7; ctx.lineCap = 'round';
+
+            let b = (this.state==='idle') ? Math.sin(this.time)*4 : 0;
+            let w = (this.state==='walk') ? Math.sin(this.time*2.5)*25 : 0;
+            
+            let hip = { x: 0, y: -70 };
+            let neck = { x: w*0.1, y: -140 + b };
+
+            // Body & Head
+            ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(neck.x, neck.y); ctx.stroke();
+            ctx.beginPath(); ctx.arc(neck.x, neck.y-25, 16, 0, Math.PI*2); ctx.stroke();
+
+            // Legs
+            let lx = (this.state==='walk') ? w : (this.state==='atk_low' ? 60 : 10);
+            this.drawLimb(hip, 35, 35, lx, 0, true);
+            this.drawLimb(hip, 35, 35, -lx*0.5, 0, true);
+
+            // Arms
+            let sh = { x: neck.x, y: neck.y + 10 };
+            let ax = this.state.includes('atk') ? 70 : 15;
+            let ay = this.state==='atk_high' ? -50 : 10;
+            this.drawLimb(sh, 30, 30, ax, ay, false);
+            this.drawLimb(sh, 30, 30, -15, 15, false);
+
+            ctx.restore();
+        }
+
+        drawLimb(start, l1, l2, tx, ty, isLeg) {
+            let bend = isLeg ? 15 : -15;
+            let knee = { x: start.x + tx/2 + bend, y: start.y + l1 };
+            let foot = { x: start.x + tx, y: start.y + l1 + l2 + ty };
+            ctx.beginPath(); ctx.moveTo(start.x, start.y);
+            ctx.lineTo(knee.x, knee.y); ctx.lineTo(foot.x, foot.y); ctx.stroke();
+        }
+    }
+
+    const P1 = new Stickman(canvas.width * 0.2, '#fff', true);
+    const AI = new Stickman(canvas.width * 0.8, '#ff3b30', false);
+
+    // INPUTS
+    let joy = { active: false, x: 0, y: 0 };
     const knob = document.getElementById('joy-knob');
     const base = document.getElementById('joy-base');
 
-    base.addEventListener('touchstart', e => { j.active = true; });
+    base.addEventListener('touchstart', () => joy.active = true);
     window.addEventListener('touchmove', e => {
-        if(!j.active) return;
-        let t = e.touches[0];
-        let r = base.getBoundingClientRect();
-        let dx = t.clientX - (r.left + 70);
-        let dy = t.clientY - (r.top + 70);
-        let d = Math.min(50, Math.sqrt(dx*dx + dy*dy));
-        let angle = Math.atan2(dy, dx);
-        j.x = Math.cos(angle) * d;
-        j.y = Math.sin(angle) * d;
-        knob.style.transform = `translate(${j.x}px, ${j.y}px)`;
+        if(!joy.active) return;
+        let t = e.touches[0], r = base.getBoundingClientRect();
+        let dx = t.clientX - (r.left + 65), dy = t.clientY - (r.top + 65);
+        let d = Math.min(45, Math.sqrt(dx*dx + dy*dy));
+        let ang = Math.atan2(dy, dx);
+        joy.x = Math.cos(ang) * d; joy.y = Math.sin(ang) * d;
+        knob.style.transform = `translate(${joy.x}px, ${joy.y}px)`;
     });
     window.addEventListener('touchend', () => {
-        j.active = false; j.x = 0; j.y = 0;
+        joy.active = false; joy.x = 0; joy.y = 0;
         knob.style.transform = `translate(0,0)`;
     });
 
-    // AKCIÓK ÉS KILÉPÉS
-    document.getElementById('exit-btn').onclick = () => { if(confirm("Kilépsz?")) location.reload(); };
-    
-    const setAtk = (s) => { f.state = s; setTimeout(()=> { if(f.state===s) f.state='idle'; }, 250); };
-    document.getElementById('btn-A').ontouchstart = () => setAtk('atk_mid');
-    document.getElementById('btn-B').ontouchstart = () => setAtk('atk_high');
-    document.getElementById('btn-C').ontouchstart = () => setAtk('atk_high');
-    document.getElementById('btn-D').ontouchstart = () => setAtk('atk_low');
+    function doAtk(p, type) {
+        if(p.hp <= 0) return;
+        p.state = type;
+        // Hit detection
+        let target = (p === P1) ? AI : P1;
+        let dist = Math.abs(p.x - target.x);
+        if(dist < 100 && target.hp > 0) {
+            target.hp -= 5;
+            target.vx = p.dir * 10; // Knockback
+            shake = 10;
+            spawnParticles(target.x, target.y - 100);
+            document.getElementById(p === P1 ? 'hp-enemy' : 'hp-player').style.width = target.hp + '%';
+        }
+        setTimeout(() => { if(p.state === type) p.state = 'idle'; }, 200);
+    }
 
-    function drawLimb(ctx, start, l1, l2, targetX, targetY, isLeg) {
-        let bend = (isLeg) ? 20 : -20;
-        let knee = { x: start.x + targetX/2 + bend, y: start.y + l1 };
-        let foot = { x: start.x + targetX, y: start.y + l1 + l2 + targetY };
-        ctx.beginPath();
-        ctx.moveTo(start.x, start.y);
-        ctx.lineTo(knee.x, knee.y);
-        ctx.lineTo(foot.x, foot.y);
-        ctx.stroke();
+    function spawnParticles(x, y) {
+        for(let i=0; i<10; i++) {
+            particles.push({x, y, vx: (Math.random()-0.5)*15, vy: (Math.random()-0.5)*15, life: 1});
+        }
+    }
+
+    document.getElementById('btn-A').ontouchstart = () => doAtk(P1, 'atk_mid');
+    document.getElementById('btn-B').ontouchstart = () => doAtk(P1, 'atk_high');
+    document.getElementById('btn-C').ontouchstart = () => { P1.vx = P1.dir * 25; doAtk(P1, 'atk_high'); };
+    document.getElementById('btn-D').ontouchstart = () => doAtk(P1, 'atk_low');
+
+    function updateAI() {
+        if(AI.hp <= 0) return;
+        let dist = P1.x - AI.x;
+        AI.dir = dist > 0 ? 1 : -1;
+        
+        if(Math.abs(dist) > 120) {
+            AI.vx = AI.dir * 4;
+            AI.state = 'walk';
+        } else {
+            if(Math.random() < 0.05) doAtk(AI, 'atk_mid');
+            AI.state = 'idle';
+        }
     }
 
     function loop() {
-        ctx.fillStyle = '#050505';
+        ctx.fillStyle = '#0a0a0a';
         ctx.fillRect(0,0,canvas.width, canvas.height);
 
-        // PADLÓ
-        ctx.strokeStyle = '#222'; ctx.beginPath(); ctx.moveTo(0,floorY); ctx.lineTo(canvas.width, floorY); ctx.stroke();
-
-        // IRÁNYÍTÁS ÉS FIZIKA
-        if(f.onGround) {
-            f.vx = (j.x / 50) * 8;
-            if(j.y < -30) { f.vy = -22; f.onGround = false; } // Ugrás
-            if(j.y > 30) f.state = 'crouch';
-            else if(Math.abs(f.vx) > 1) f.state = 'walk';
-            else if(!f.state.startsWith('atk')) f.state = 'idle';
-        } else {
-            f.vy += 1.2; // Gravitáció
-            f.y += f.vy;
-            f.x += f.vx;
-            // SZALTÓ LOGIKA: Ha ugrunk és mozogunk oldalra
-            if(Math.abs(f.vx) > 2) f.rot += 0.2 * (f.vx > 0 ? 1 : -1);
-            else f.rot = 0;
-
-            if(f.y >= floorY) { f.y = floorY; f.onGround = true; f.rot = 0; }
+        // Screen Shake
+        if(shake > 0) {
+            ctx.save();
+            ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+            shake *= 0.8;
         }
 
-        f.x += f.vx;
-        f.dir = (f.x > canvas.width / 2) ? -1 : 1;
+        // Floor
+        ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, floorY); ctx.lineTo(canvas.width, floorY); ctx.stroke();
 
-        // RAJZOLÁS
-        ctx.save();
-        ctx.translate(f.x, f.y - (f.state==='crouch'? 40 : 0));
-        ctx.rotate(f.rot);
-        ctx.scale(f.dir, 1);
-        ctx.strokeStyle = '#fff'; ctx.lineWidth = 8; ctx.lineCap = 'round';
+        // P1 Control
+        if(P1.hp > 0) {
+            if(joy.x !== 0) { P1.vx = (joy.x/45)*7; P1.state = 'walk'; P1.dir = P1.vx > 0 ? 1 : -1; }
+            if(joy.y < -30 && P1.onGround) { P1.vy = -20; P1.onGround = false; }
+            if(!joy.active && !P1.state.includes('atk')) P1.state = 'idle';
+        }
 
-        f.time += 0.1;
-        let b = (f.state==='idle') ? Math.sin(f.time)*5 : 0;
-        let w = (f.state==='walk') ? Math.sin(f.time*2)*20 : 0;
+        updateAI();
+        P1.update(); P1.draw();
+        AI.update(); AI.draw();
 
-        let hip = { x: 0, y: -80 };
-        let neck = { x: w*0.2, y: -150 + b };
-        
-        // TEST ÉS FEJ
-        ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(neck.x, neck.y); ctx.stroke();
-        ctx.beginPath(); ctx.arc(neck.x, neck.y-25, 18, 0, Math.PI*2); ctx.stroke();
+        // Particles
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+            ctx.strokeStyle = `rgba(255,255,255,${p.life})`;
+            ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x-p.vx, p.y-p.vy); ctx.stroke();
+            if(p.life <= 0) particles.splice(i, 1);
+        });
 
-        // LÁBAK
-        let legX = (f.state==='walk') ? w : (f.state==='atk_low' ? 70 : 10);
-        drawLimb(ctx, hip, 40, 40, legX, 0, true);
-        drawLimb(ctx, hip, 40, 40, -legX/2, 0, true);
-
-        // KAROK
-        let sh = { x: neck.x, y: neck.y + 10 };
-        let atkX = f.state==='atk_mid' ? 80 : (f.state==='atk_high' ? 90 : 20);
-        let atkY = f.state==='atk_high' ? -50 : 10;
-        drawLimb(ctx, sh, 35, 35, atkX, atkY, false);
-        drawLimb(ctx, sh, 35, 35, -20, 20, false);
-
-        ctx.restore();
+        if(shake > 0) ctx.restore();
         requestAnimationFrame(loop);
     }
+
     loop();
 </script>
 </body>
