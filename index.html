@@ -3,23 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Stickman Kombat 2026</title>
+    <title>Stickman Kombat Fix</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: 'Courier New', monospace; }
-        canvas { display: block; filter: drop-shadow(0 0 10px rgba(0,255,255,0.2)); }
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        canvas { display: block; }
         
-        /* UI */
-        .bars { position: fixed; top: 30px; width: 100%; display: flex; justify-content: space-around; pointer-events: none; }
-        .hp-cont { width: 40%; height: 25px; background: #333; border: 2px solid #eee; position: relative; }
-        .hp-fill { height: 100%; background: linear-gradient(to bottom, #f00, #900); width: 100%; transition: width 0.3s; }
-        .name { color: #fff; position: absolute; top: -20px; font-weight: bold; text-transform: uppercase; }
+        /* HP SÁVOK */
+        .bars { position: fixed; top: 20px; width: 100%; display: flex; justify-content: space-evenly; pointer-events: none; }
+        .hp-cont { width: 40%; height: 20px; background: #333; border: 2px solid #fff; border-radius: 5px; }
+        .hp-fill { height: 100%; background: #f00; width: 100%; transition: width 0.2s; }
 
-        /* CONTROLS */
-        #joy-zone { position: fixed; bottom: 40px; left: 40px; width: 150px; height: 150px; border-radius: 50%; background: rgba(255,255,255,0.05); border: 1px solid #444; }
-        #knob { position: absolute; width: 60px; height: 60px; background: radial-gradient(circle, #444, #111); border-radius: 50%; border: 2px solid #888; left: 45px; top: 45px; }
+        /* JOYSTICK */
+        #joy-zone { 
+            position: fixed; bottom: 40px; left: 40px; width: 150px; height: 150px; 
+            background: rgba(255,255,255,0.1); border-radius: 50%; border: 2px solid #555;
+        }
+        #knob { 
+            position: absolute; width: 60px; height: 60px; background: #007aff; 
+            border-radius: 50%; left: 45px; top: 45px; pointer-events: none;
+        }
         
-        .btns { position: fixed; bottom: 40px; right: 40px; display: grid; grid-template-columns: 80px 80px; gap: 15px; }
-        .b { width: 75px; height: 75px; border-radius: 15px; border: 3px solid #666; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; background: rgba(0,0,0,0.6); }
+        /* GOMBOK - Tágasabb elrendezés */
+        .btns { position: fixed; bottom: 40px; right: 40px; display: grid; grid-template-columns: 90px 90px; gap: 20px; }
+        .b { 
+            width: 85px; height: 85px; border-radius: 50%; border: 4px solid #fff; 
+            color: #fff; display: flex; align-items: center; justify-content: center; 
+            font-weight: bold; background: rgba(0,0,0,0.7); font-size: 20px;
+        }
         #b-hp { border-color: #ff3b30; } #b-lp { border-color: #007aff; }
         #b-hk { border-color: #ffcc00; } #b-lk { border-color: #30d158; }
     </style>
@@ -27,8 +37,8 @@
 <body>
 
 <div class="bars">
-    <div class="hp-cont"><div class="name">P1 - Stickman</div><div id="p1-hp" class="hp-fill"></div></div>
-    <div class="hp-cont"><div class="name" style="right:0">CPU - Shadow</div><div id="p2-hp" class="hp-fill"></div></div>
+    <div class="hp-cont"><div id="p1-hp" class="hp-fill"></div></div>
+    <div class="hp-cont"><div id="p2-hp" class="hp-fill"></div></div>
 </div>
 
 <div id="joy-zone"><div id="knob"></div></div>
@@ -53,15 +63,14 @@ class Fighter {
         this.vx = 0; this.vy = 0;
         this.hp = 100;
         this.color = color;
-        this.side = side; // 1 vagy -1
+        this.side = side; 
         this.state = 'IDLE';
         this.animFrame = 0;
         this.onGround = true;
-        this.rotation = 0;
+        this.rot = 0;
     }
 
-    update(opponent) {
-        // Fizika
+    update(opp) {
         this.vy += 1.5;
         this.x += this.vx;
         this.y += this.vy;
@@ -70,187 +79,143 @@ class Fighter {
         if (this.y >= floor) {
             this.y = floor;
             this.vy = 0;
-            if (!this.onGround) this.land();
             this.onGround = true;
+            this.rot = 0;
         }
 
-        // Automatikus fordulás az ellenfél felé (ha nincs épp ugrásban/szaltóban)
         if (this.onGround && this.state !== 'HIT') {
-            this.side = this.x < opponent.x ? 1 : -1;
+            this.side = this.x < opp.x ? 1 : -1;
         }
 
-        // Animáció kezelés
-        this.animFrame++;
-        if (this.state !== 'IDLE' && this.animFrame > 15) {
-            if (this.onGround) this.state = 'IDLE';
+        if (!this.onGround && Math.abs(this.vx) > 2) {
+            this.rot += 0.2 * Math.sign(this.vx);
         }
 
-        // Szaltó logika
-        if (!this.onGround) {
-            if (Math.abs(this.vx) > 3) {
-                this.rotation += 0.3 * Math.sign(this.vx);
-            }
-        } else {
-            this.rotation *= 0.5;
+        if (this.state !== 'IDLE' && this.state !== 'WALK') {
+            this.animFrame++;
+            if (this.animFrame > 12) this.state = 'IDLE';
         }
-    }
-
-    land() {
-        this.rotation = 0;
-        // Effektek ide...
     }
 
     draw() {
         ctx.save();
         ctx.translate(this.x, this.y);
-        ctx.rotate(this.rotation);
+        ctx.rotate(this.rot);
         ctx.scale(this.side, 1);
         
         ctx.strokeStyle = this.color;
-        ctx.lineWidth = 6;
+        ctx.lineWidth = 8;
         ctx.lineCap = 'round';
 
-        let t = this.animFrame;
-        let walkCycle = Math.sin(Date.now() * 0.01) * 20;
-        
-        // Mozgási pózok definiálása
-        let headY = -140;
-        let hipY = -75;
-        let lLegX = 10, rLegX = -10, lArmX = 15, rArmX = -15;
+        let walk = (this.state === 'WALK') ? Math.sin(Date.now() * 0.012) * 25 : 0;
+        let bodyY = -140;
+        let hipY = -70;
 
-        if (this.state === 'WALK') {
-            lLegX = walkCycle; rLegX = -walkCycle;
-            lArmX = -walkCycle; rArmX = walkCycle;
-        } else if (this.state === 'HP') {
-            lArmX = 80; headY += 10;
-        } else if (this.state === 'HK') {
-            rLegX = 90; rLegX += 10; this.vx += this.side * 2;
-        } else if (this.state === 'LP') {
-            lArmX = 60;
-        } else if (this.state === 'LK') {
-            lLegX = 70;
-        }
+        // Törzs és fej
+        ctx.beginPath(); ctx.moveTo(0, hipY); ctx.lineTo(0, bodyY); ctx.stroke();
+        ctx.beginPath(); ctx.arc(0, bodyY-20, 15, 0, Math.PI*2); ctx.stroke();
 
-        // Törzs
-        ctx.beginPath();
-        ctx.moveTo(0, hipY); ctx.lineTo(0, headY);
-        ctx.stroke();
+        // Lábak - Szimmetrikus mozgás
+        this.drawLimb(0, hipY, walk, 0, true);
+        this.drawLimb(0, hipY, -walk, 0, true);
 
-        // Fej
-        ctx.beginPath();
-        ctx.arc(0, headY - 20, 15, 0, Math.PI * 2);
-        ctx.stroke();
+        // Karok - Harci póz vagy ütés
+        let lArm = 20, rArm = -20, armY = 20;
+        if (this.state === 'LP') lArm = 70;
+        if (this.state === 'HP') lArm = 90;
+        if (this.state === 'LK') { walk = 60; }
+        if (this.state === 'HK') { walk = 80; }
 
-        // Lábak (MK-stílusú hajlítás)
-        this.drawLimb(0, hipY, lLegX, 0);
-        this.drawLimb(0, hipY, rLegX, 0);
-
-        // Karok
-        this.drawLimb(0, headY + 20, lArmX, -20);
-        this.drawLimb(0, headY + 20, rArmX, 20);
+        this.drawLimb(0, bodyY + 30, lArm, armY, false);
+        this.drawLimb(0, bodyY + 30, rArm, armY, false);
 
         ctx.restore();
     }
 
-    drawLimb(sx, sy, tx, ty) {
+    drawLimb(sx, sy, tx, ty, isLeg) {
+        let bend = isLeg ? 15 : -10;
         ctx.beginPath();
         ctx.moveTo(sx, sy);
-        ctx.lineTo(tx/2 + (tx > 30 ? 10 : 0), sy + 35);
-        ctx.lineTo(tx, sy + 75 + ty);
+        ctx.lineTo(tx/2 + bend, sy + 35);
+        ctx.lineTo(tx, sy + 70 + ty);
         ctx.stroke();
     }
 }
 
-const p1 = new Fighter(200, '#00d2ff', 1);
-const p2 = new Fighter(canvas.width - 200, '#ff3b30', -1);
+const p1 = new Fighter(canvas.width * 0.25, '#fff', 1);
+const p2 = new Fighter(canvas.width * 0.75, '#ff3b30', -1);
 
-// KONTROLLER
+// IRÁNYÍTÁS JAVÍTÁSA
 let joy = { x: 0, y: 0, active: false };
+const zone = document.getElementById('joy-zone');
 const knob = document.getElementById('knob');
 
-window.addEventListener('touchstart', e => {
-    if (e.target.id === 'joy-zone' || e.target.id === 'knob') joy.active = true;
-});
-
-window.addEventListener('touchmove', e => {
+zone.addEventListener('touchstart', (e) => { joy.active = true; });
+window.addEventListener('touchmove', (e) => {
     if (!joy.active) return;
     let t = e.touches[0];
-    let rect = document.getElementById('joy-zone').getBoundingClientRect();
-    let dx = t.clientX - (rect.left + rect.width/2);
-    let dy = t.clientY - (rect.top + rect.height/2);
-    let dist = Math.min(50, Math.sqrt(dx*dx + dy*dy));
-    let angle = Math.atan2(dy, dx);
-    joy.x = Math.cos(angle) * dist;
-    joy.y = Math.sin(angle) * dist;
+    let r = zone.getBoundingClientRect();
+    let dx = t.clientX - (r.left + 75);
+    let dy = t.clientY - (r.top + 75);
+    let d = Math.min(50, Math.sqrt(dx*dx + dy*dy));
+    let ang = Math.atan2(dy, dx);
+    joy.x = Math.cos(ang) * d;
+    joy.y = Math.sin(ang) * d;
     knob.style.transform = `translate(${joy.x}px, ${joy.y}px)`;
 });
-
 window.addEventListener('touchend', () => {
     joy.active = false; joy.x = 0; joy.y = 0;
     knob.style.transform = `translate(0,0)`;
 });
 
-// HARC LOGIKA
 function attack(p, type, dmg) {
-    p.state = type;
-    p.animFrame = 0;
-    let target = (p === p1) ? p2 : p1;
-    let dist = Math.abs(p.x - target.x);
-    
-    if (dist < 120) {
-        target.hp -= dmg;
-        target.vx = p.side * 15;
-        target.state = 'HIT';
-        document.getElementById((p === p1 ? 'p2' : 'p1') + '-hp').style.width = target.hp + '%';
+    if (p.state !== 'IDLE' && p.state !== 'WALK') return;
+    p.state = type; p.animFrame = 0;
+    let opp = (p === p1) ? p2 : p1;
+    if (Math.abs(p.x - opp.x) < 120) {
+        opp.hp -= dmg;
+        opp.vx = p.side * 15;
+        document.getElementById((p === p1 ? 'p2' : 'p1') + '-hp').style.width = opp.hp + '%';
     }
 }
 
-document.getElementById('b-lp').ontouchstart = () => attack(p1, 'LP', 5);
-document.getElementById('b-hp').ontouchstart = () => attack(p1, 'HP', 10);
-document.getElementById('b-lk').ontouchstart = () => attack(p1, 'LK', 7);
-document.getElementById('b-hk').ontouchstart = () => attack(p1, 'HK', 12);
+// GOMBOK ESEMÉNYKEZELŐI
+const bindBtn = (id, type, dmg) => {
+    document.getElementById(id).addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        attack(p1, type, dmg);
+    });
+};
+bindBtn('b-lp', 'LP', 5); bindBtn('b-hp', 'HP', 10);
+bindBtn('b-lk', 'LK', 7); bindBtn('b-hk', 'HK', 12);
 
 function loop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Háttér rács (MK hangulat)
-    ctx.strokeStyle = '#111';
-    for(let i=0; i<canvas.width; i+=50) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
-
-    // Padló
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(0, floor); ctx.lineTo(canvas.width, floor); ctx.stroke();
-
-    // P1 mozgás
+    // Mozgás
     if (joy.active) {
         if (Math.abs(joy.x) > 10) {
             p1.vx = (joy.x/50) * 8;
             if (p1.onGround) p1.state = 'WALK';
         }
-        if (joy.y < -30 && p1.onGround) {
-            p1.vy = -25;
-            p1.onGround = false;
-        }
+        if (joy.y < -30 && p1.onGround) { p1.vy = -25; p1.onGround = false; }
     } else if (p1.onGround && p1.state === 'WALK') {
         p1.state = 'IDLE';
     }
 
-    // Egyszerű AI p2-nek
+    // AI
+    let dist = p1.x - p2.x;
     if (p2.hp > 0) {
-        let d = p1.x - p2.x;
-        if (Math.abs(d) > 150) p2.vx = Math.sign(d) * 3;
-        if (Math.abs(d) < 100 && Math.random() < 0.05) attack(p2, 'LP', 2);
+        if (Math.abs(dist) > 130) p2.vx = Math.sign(dist) * 3.5;
+        if (Math.abs(dist) < 110 && Math.random() < 0.04) attack(p2, 'LP', 2);
     }
 
-    p1.update(p2);
-    p2.update(p1);
-    
-    p1.draw();
-    p2.draw();
+    p1.update(p2); p2.update(p1);
+    p1.draw(); p2.draw();
 
     requestAnimationFrame(loop);
 }
-
 loop();
 </script>
 </body>
