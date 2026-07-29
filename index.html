@@ -3,240 +3,286 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Stickman Pro Kombat - Elite Edition</title>
+    <title>Beosztás PRO</title>
+    <link rel="manifest" href="manifest.json">
     <style>
-        body { margin: 0; background: #0a0a0a; overflow: hidden; touch-action: none; font-family: 'Arial Black', sans-serif; }
-        canvas { display: block; }
+        :root {
+            --bg: #000000; --card: #1c1c1e; --text: #ffffff;
+            --accent: #007aff; --border: #2c2c2e; --secondary: #8e8e93;
+            --danger: #ff453a; --success: #30d158; --warning: #ff9f0a;
+        }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); margin: 0; padding: 10px; color: var(--text); -webkit-tap-highlight-color: transparent; user-select: none; }
+        .container { max-width: 600px; margin: auto; background: #121212; padding: 15px; border-radius: 28px; border: 1px solid var(--border); box-shadow: 0 20px 40px rgba(0,0,0,0.8); box-sizing: border-box; min-height: 95vh; display: flex; flex-direction: column; }
         
-        /* UI Design */
-        .ui-layer { position: fixed; top: 0; width: 100%; height: 100%; pointer-events: none; }
-        .hud { display: flex; justify-content: space-between; padding: 20px 40px; }
-        .health-bar-wrapper { width: 40%; height: 25px; background: rgba(255,255,255,0.1); border: 3px solid #333; transform: skewX(-15deg); overflow: hidden; box-shadow: 0 0 15px rgba(0,0,0,0.5); }
-        .hp-fill { height: 100%; width: 100%; transition: width 0.2s cubic-bezier(0.17, 0.67, 0.83, 0.67); }
-        #p1-hp { background: linear-gradient(90deg, #007aff, #5ac8fa); }
-        #p2-hp { background: linear-gradient(90deg, #ff3b30, #ff9500); }
-        
-        .combo-counter { position: absolute; top: 80px; left: 50px; color: #fff; font-size: 30px; font-style: italic; opacity: 0; transition: opacity 0.3s; text-shadow: 2px 2px #ff3b30; }
+        .nav-group { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 8px 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-btn { background: none; border: none; color: var(--accent); font-size: 18px; cursor: pointer; padding: 0 8px; }
+        .nav-title { font-weight: bold; font-size: 15px; }
 
-        /* Kontrollerek */
-        #joy-zone { position: fixed; bottom: 40px; left: 40px; width: 130px; height: 130px; background: rgba(255,255,255,0.03); border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; pointer-events: auto; }
-        #knob { position: absolute; width: 60px; height: 60px; background: #fff; border-radius: 50%; left: 35px; top: 35px; box-shadow: 0 0 20px rgba(255,255,255,0.2); }
+        .schedule-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+        .schedule-table th, .schedule-table td { border: 1px solid var(--border); text-align: center; padding: 6px 2px; }
+        .schedule-table th { background: #1a1a1c; font-size: 11px; color: var(--secondary); }
+        .day-header-name { font-size: 12px; color: var(--accent); display: block; }
+        .day-header-num { font-size: 10px; color: var(--secondary); display: block; margin-top: 2px; }
         
-        .btns { position: fixed; bottom: 40px; right: 40px; display: grid; grid-template-columns: 85px 85px; gap: 15px; pointer-events: auto; }
-        .b { width: 80px; height: 80px; border-radius: 15px; background: rgba(255,255,255,0.05); border: 2px solid #fff; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; text-align: center; backdrop-filter: blur(5px); }
-        .b:active { background: #fff; color: #000; }
+        .name-col { text-align: left !important; padding-left: 10px !important; font-size: 13px; font-weight: bold; width: 85px; white-space: nowrap; }
+        .cell-slot { height: 36px; cursor: pointer; font-size: 16px; vertical-align: middle; transition: background 0.1s; }
+        .cell-slot:active { background: #2c2c2e; }
+        
+        .status-check { color: var(--success); font-weight: bold; }
+        .status-cross { color: var(--danger); font-weight: bold; }
+        
+        .separator-row td { background: #0a0a0a; height: 10px; border-left: none; border-right: none; }
+        .summary-row td { background: #18181a; font-weight: bold; font-size: 13px; color: var(--warning); }
+
+        #loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: none; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-<div class="ui-layer">
-    <div class="hud">
-        <div class="health-bar-wrapper"><div id="p1-hp" class="hp-fill"></div></div>
-        <div class="health-bar-wrapper"><div id="p2-hp" class="hp-fill"></div></div>
+<div id="loading-overlay">Szinkronizálás...</div>
+
+<div id="app-container" class="container">
+    <h2 style="margin: 5px 0 15px 0; font-size: 20px; text-align:center;">Heti Beosztás</h2>
+    
+    <!-- Év Lapozó -->
+    <div class="nav-group">
+        <button class="nav-btn" onclick="changeYear(-1)">❮</button>
+        <span id="year-display" class="nav-title">2026</span>
+        <button class="nav-btn" onclick="changeYear(1)">❯</button>
     </div>
-    <div id="combo-ui" class="combo-counter">0 HIT COMBO</div>
-</div>
+    
+    <!-- Hónap Lapozó -->
+    <div class="nav-group">
+        <button class="nav-btn" onclick="changeMonth(-1)">❮</button>
+        <span id="month-display" class="nav-title">Július</span>
+        <button class="nav-btn" onclick="changeMonth(1)">❯</button>
+    </div>
 
-<div id="joy-zone"><div id="knob"></div></div>
-<div class="btns">
-    <div class="b" id="b-hp">NAGY<br>ÜTÉS</div><div class="b" id="b-lp">KIS<br>ÜTÉS</div>
-    <div class="b" id="b-hk">NAGY<br>RÚGÁS</div><div class="b" id="b-lk">KIS<br>RÚGÁS</div>
-</div>
+    <!-- Hét Lapozó -->
+    <div class="nav-group" style="border-color: var(--accent);">
+        <button class="nav-btn" onclick="changeWeek(-1)">❮</button>
+        <span id="week-display" class="nav-title" style="color: var(--accent);">31. Hét</span>
+        <button class="nav-btn" onclick="changeWeek(1)">❯</button>
+    </div>
 
-<canvas id="game"></canvas>
+    <!-- Táblázat -->
+    <div style="overflow-x: auto; flex-grow: 1;">
+        <table class="schedule-table" id="schedule-table">
+            <thead>
+                <tr id="table-header-row">
+                    <th class="name-col">Név</th>
+                    <!-- Dinamikus napok jönnek ide -->
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Dinamikus dolgozók jönnek ide -->
+            </tbody>
+        </table>
+    </div>
+</div>
 
 <script>
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-
-let floor, lastTime = 0, shake = 0, particles = [];
-let comboCount = 0, comboTimer = 0;
-
-function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    floor = canvas.height * 0.8;
-}
-window.addEventListener('resize', resize);
-resize();
-
-// Effekt rendszer (Vér/Szikra)
-class Particle {
-    constructor(x, y, color) {
-        this.x = x; this.y = y;
-        this.vx = (Math.random() - 0.5) * 10;
-        this.vy = (Math.random() - 0.5) * 10;
-        this.alpha = 1;
-        this.color = color;
-    }
-    update() { this.x += this.vx; this.y += this.vy; this.alpha -= 0.02; }
-    draw() {
-        ctx.globalAlpha = this.alpha;
-        ctx.fillStyle = this.color;
-        ctx.fillRect(this.x, this.y, 4, 4);
-        ctx.globalAlpha = 1;
-    }
-}
-
-class Fighter {
-    constructor(x, color, isPlayer) {
-        this.x = x; this.y = floor;
-        this.vx = 0; this.vy = 0;
-        this.hp = 100;
-        this.color = color;
-        this.side = isPlayer ? 1 : -1;
-        this.state = 'IDLE';
-        this.frame = 0;
-        this.onGround = true;
-        this.hitStun = 0;
-    }
-
-    update(opp, dt) {
-        const m = dt / 16;
-        if (this.hitStun > 0) this.hitStun -= m;
-
-        this.vy += 1.2 * m;
-        this.x += this.vx * m;
-        this.y += this.vy * m;
-        this.vx *= Math.pow(0.8, m);
-
-        if (this.x < 60) this.x = 60;
-        if (this.x > canvas.width - 60) this.x = canvas.width - 60;
-        if (this.y >= floor) { this.y = floor; this.vy = 0; this.onGround = true; }
-
-        if (this.onGround && this.hitStun <= 0) {
-            this.side = this.x < opp.x ? 1 : -1;
-            if (this.state !== 'IDLE' && this.state !== 'WALK') {
-                this.frame += 1 * m;
-                if (this.frame > 15) this.state = 'IDLE';
-            }
-        }
-    }
-
-    draw() {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.scale(this.side, 1);
-        ctx.strokeStyle = this.hitStun > 0 ? "#fff" : this.color;
-        ctx.lineWidth = 8;
-        ctx.lineCap = 'round';
-
-        let bodyY = -120, walk = (this.state === 'WALK') ? Math.sin(Date.now() * 0.015) * 20 : 0;
-
-        // Karakter váz
-        ctx.beginPath(); ctx.moveTo(0,-60); ctx.lineTo(0, bodyY); ctx.stroke(); // Törzs
-        ctx.beginPath(); ctx.arc(0, bodyY - 20, 18, 0, Math.PI*2); ctx.stroke(); // Fej
-
-        // Lábak mozgása
-        ctx.beginPath(); ctx.moveTo(0,-60); ctx.lineTo(walk, 0); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0,-60); ctx.lineTo(-walk, 0); ctx.stroke();
-
-        // Harci pózok
-        let hX = 25, hY = bodyY + 30;
-        if (this.state === 'HP') { hX = 80; hY = bodyY - 20; }
-        if (this.state === 'LP') { hX = 70; hY = bodyY + 40; }
-        
-        ctx.beginPath(); ctx.moveTo(0, bodyY + 30); ctx.lineTo(hX, hY); ctx.stroke();
-        ctx.fillStyle = ctx.strokeStyle;
-        ctx.beginPath(); ctx.arc(hX, hY, 12, 0, Math.PI*2); ctx.fill(); // Kesztyű
-
-        if (this.state === 'HK') { ctx.beginPath(); ctx.moveTo(0,-60); ctx.lineTo(60, bodyY-10); ctx.stroke(); }
-        if (this.state === 'LK') { ctx.beginPath(); ctx.moveTo(0,-60); ctx.lineTo(70, -60); ctx.stroke(); }
-
-        ctx.restore();
-    }
-}
-
-const p1 = new Fighter(200, '#007aff', true);
-const p2 = new Fighter(window.innerWidth - 200, '#ff3b30', false);
-
-function doHit(p, opp, dmg) {
-    if (Math.abs(p.x - opp.x) < 130) {
-        opp.hp -= dmg;
-        opp.hitStun = 10;
-        opp.vx = p.side * 15;
-        shake = 10;
-        for(let i=0; i<8; i++) particles.push(new Particle(opp.x, opp.y - 100, opp.color));
-        
-        if (p === p1) {
-            comboCount++;
-            comboTimer = 60;
-            const ui = document.getElementById('combo-ui');
-            ui.innerText = comboCount + " HIT COMBO";
-            ui.style.opacity = 1;
-        }
-        
-        document.getElementById(p === p1 ? 'p2-hp' : 'p1-hp').style.width = Math.max(0, opp.hp) + '%';
-    }
-}
-
-// Gomb események
-const setupBtn = (id, type, dmg) => {
-    document.getElementById(id).addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        if (p1.state === 'IDLE' || p1.state === 'WALK') {
-            p1.state = type; p1.frame = 0;
-            doHit(p1, p2, dmg);
-        }
-    });
-};
-setupBtn('b-hp', 'HP', 15); setupBtn('b-lp', 'LP', 7);
-setupBtn('b-hk', 'HK', 18); setupBtn('b-lk', 'LK', 10);
-
-let joy = { x: 0, y: 0, active: false };
-const zone = document.getElementById('joy-zone');
-zone.addEventListener('touchstart', (e) => { joy.active = true; e.preventDefault(); });
-window.addEventListener('touchmove', (e) => {
-    if (!joy.active) return;
-    let t = e.touches[0], r = zone.getBoundingClientRect();
-    joy.x = Math.max(-50, Math.min(50, t.clientX - (r.left + 65)));
-    joy.y = Math.max(-50, Math.min(50, t.clientY - (r.top + 65)));
-    document.getElementById('knob').style.transform = `translate(${joy.x}px, ${joy.y}px)`;
-});
-window.addEventListener('touchend', () => { joy.active = false; joy.x = 0; joy.y = 0; document.getElementById('knob').style.transform = 'translate(0,0)'; });
-
-function loop(t) {
-    let dt = t - lastTime; lastTime = t;
-    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(0,0,canvas.width, canvas.height);
-
-    // Kamera rázkódás
-    ctx.save();
-    if (shake > 0) { ctx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake); shake *= 0.9; }
-
-    // Padló
-    ctx.strokeStyle = '#222'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.moveTo(0, floor); ctx.lineTo(canvas.width, floor); ctx.stroke();
-
-    // P1 Irányítás
-    if (joy.active) {
-        if (Math.abs(joy.x) > 10) { p1.vx = (joy.x/50) * 8; p1.state = 'WALK'; }
-        if (joy.y < -25 && p1.onGround) { p1.vy = -25; p1.onGround = false; }
-    } else if (p1.state === 'WALK') p1.state = 'IDLE';
-
-    // AI (Támadóbb és okosabb)
-    if (p2.hp > 0) {
-        let d = p1.x - p2.x;
-        if (Math.abs(d) > 110) p2.vx = Math.sign(d) * 4;
-        else if (Math.random() < 0.05 && p2.state === 'IDLE') {
-            p2.state = Math.random() > 0.5 ? 'LP' : 'LK'; p2.frame = 0;
-            doHit(p2, p1, 5);
-        }
-    }
-
-    // Combo rendszer kezelése
-    if (comboTimer > 0) { comboTimer--; } else { document.getElementById('combo-ui').style.opacity = 0; comboCount = 0; }
-
-    // Update & Draw
-    p1.update(p2, dt); p2.update(p1, dt);
-    p1.draw(); p2.draw();
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('./sw.js'); }
+    const DB_URL = "https://kiadaskoveto-2e474-default-rtdb.firebaseio.com/";
     
-    particles = particles.filter(p => p.alpha > 0);
-    particles.forEach(p => { p.update(); p.draw(); });
+    const group1 = ["Móni", "Eszti", "Babi", "Andris", "Szilvi", "Ági", "Jani", "Brigi"];
+    const group2 = ["Viki", "Feri"];
+    const months = ["Január", "Február", "Március", "Április", "Május", "Június", "Július", "Augusztus", "Szeptember", "Október", "November", "December"];
+    const dayNames = ["H", "K", "Sze", "Cs", "P", "Szo", "V"];
 
-    ctx.restore();
-    requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
+    let currentDate = new Date();
+    let scheduleData = {};
+
+    async function init() {
+        await loadRemoteData();
+        render();
+    }
+
+    async function loadRemoteData() {
+        showLoading(true);
+        try {
+            const res = await fetch(`${DB_URL}beosztas_data.json`);
+            const data = await res.json();
+            if(data) scheduleData = data;
+        } catch(e) { console.log("Offline mód"); }
+        showLoading(false);
+    }
+
+    async function syncData() {
+        try {
+            await fetch(`${DB_URL}beosztas_data.json`, { method: 'PUT', body: JSON.stringify(scheduleData) });
+        } catch(e) { console.log("Hálózati hiba mentéskor"); }
+    }
+
+    function getWeekNumber(d) {
+        d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+        d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
+        let yearStart = new Date(Date.UTC(d.getUTCFullYear(),0,1));
+        return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
+    }
+
+    // Aktuális hét hétfőjének lekérése
+    function getMonday(d) {
+        d = new Date(d);
+        let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1);
+        return new Date(d.setDate(diff));
+    }
+
+    function getDaysOfCurrentWeek() {
+        let monday = getMonday(currentDate);
+        let days = [];
+        for(let i = 0; i < 7; i++) {
+            let nextDay = new Date(monday);
+            nextDay.setDate(monday.getDate() + i);
+            days.push(nextDay);
+        }
+        return days;
+    }
+
+    function render() {
+        document.getElementById('year-display').innerText = currentDate.getFullYear();
+        document.getElementById('month-display').innerText = months[currentDate.getMonth()];
+        document.getElementById('week-display').innerText = `${getWeekNumber(currentDate)}. Hét`;
+
+        let days = getDaysOfCurrentWeek();
+        
+        // Fejléc renderelése
+        let headerHtml = '<th class="name-col">Név</th>';
+        days.forEach((day, index) => {
+            headerHtml += `<th><span class="day-header-name">${dayNames[index]}</span><span class="day-header-num">${day.getDate()}</span></th>`;
+        });
+        document.getElementById('table-header-row').innerHTML = headerHtml;
+
+        // Törzs renderelése
+        let bodyHtml = "";
+        
+        // 1. Csoport
+        group1.forEach(name => {
+            bodyHtml += renderEmployeeRow(name, days);
+        });
+
+        // Elválasztó sáv
+        bodyHtml += `<tr class="separator-row"><td colspan="8"></td></tr>`;
+
+        // 2. Csoport
+        group2.forEach(name => {
+            bodyHtml += renderEmployeeRow(name, days);
+        });
+
+        // Összesítő sor
+        bodyHtml += `<tr class="summary-row"><td class="name-col">Összesen</td>`;
+        days.forEach(day => {
+            let dateStr = formatDateKey(day);
+            let count = 0;
+            [...group1, ...group2].forEach(name => {
+                let key = `${name}_${dateStr}`;
+                if(scheduleData[key] === 'check') count++;
+            });
+            bodyHtml += `<td>${count > 0 ? count : ''}</td>`;
+        });
+        bodyHtml += `</tr>`;
+
+        document.getElementById('table-body').innerHTML = bodyHtml;
+    }
+
+    function renderEmployeeRow(name, days) {
+        let row = `<tr><td class="name-col">${name}</td>`;
+        days.forEach(day => {
+            let dateStr = formatDateKey(day);
+            let key = `${name}_${dateStr}`;
+            let status = scheduleData[key] || '';
+            let symbol = '';
+            let cls = '';
+            if(status === 'check') { symbol = '✓'; cls = 'status-check'; }
+            else if(status === 'cross') { symbol = '✕'; cls = 'status-cross'; }
+            
+            row += `<td class="cell-slot ${cls}" onmousedown="handlePress(event, '${name}', '${dateStr}')" ontouchstart="handleTouch(event, '${name}', '${dateStr}')">${symbol}</td>`;
+        });
+        row += `</tr>`;
+        return row;
+    }
+
+    function formatDateKey(d) {
+        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    }
+
+    // Mobil / Egér kezelés rövid és hosszú nyomáshoz
+    let pressTimer = null;
+    let isLongPress = false;
+
+    function handlePress(e, name, dateStr) {
+        if(e.type === 'mousedown' && e.button !== 0) return;
+        isLongPress = false;
+        pressTimer = setTimeout(() => {
+            isLongPress = true;
+            toggleStatus(name, dateStr, 'cross');
+        }, 500); // 500ms hosszú nyomás
+        
+        // Egér elengedés figyelés rövid kattintáshoz
+        window.addEventListener('mouseup', function mouseUpHandler() {
+            clearTimeout(pressTimer);
+            window.removeEventListener('mouseup', mouseUpHandler);
+            if(!isLongPress) {
+                toggleStatus(name, dateStr, 'check');
+            }
+        }, {once: true});
+    }
+
+    function handleTouch(e, name, dateStr) {
+        isLongPress = false;
+        pressTimer = setTimeout(() => {
+            isLongPress = true;
+            toggleStatus(name, dateStr, 'cross');
+        }, 500);
+
+        let target = e.target;
+        target.addEventListener('touchend', function touchEndHandler(ev) {
+            clearTimeout(pressTimer);
+            target.removeEventListener('touchend', touchEndHandler);
+            if(!isLongPress) {
+                ev.preventDefault(); // Dupla kattintás zoom elkerülése
+                toggleStatus(name, dateStr, 'check');
+            }
+        }, {once: true});
+    }
+
+    async function toggleStatus(name, dateStr, type) {
+        let key = `${name}_${dateStr}`;
+        let current = scheduleData[key];
+        
+        if(type === 'cross') {
+            scheduleData[key] = (current === 'cross') ? undefined : 'cross';
+        } else {
+            scheduleData[key] = (current === 'check') ? undefined : 'check';
+        }
+        
+        if(!scheduleData[key]) delete scheduleData[key];
+        
+        render();
+        await syncData();
+    }
+
+    function changeYear(n) {
+        currentDate.setFullYear(currentDate.getFullYear() + n);
+        render();
+    }
+
+    function changeMonth(n) {
+        currentDate.setMonth(currentDate.getMonth() + n);
+        render();
+    }
+
+    function changeWeek(n) {
+        currentDate.setDate(currentDate.getDate() + (n * 7));
+        render();
+    }
+
+    function showLoading(s) {
+        document.getElementById('loading-overlay').style.display = s ? 'flex' : 'none';
+    }
+
+    init();
 </script>
 </body>
 </html>
