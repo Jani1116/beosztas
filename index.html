@@ -18,6 +18,10 @@
         .nav-btn { background: none; border: none; color: var(--accent); font-size: 18px; cursor: pointer; padding: 0 8px; }
         .nav-title { font-weight: bold; font-size: 15px; }
 
+        .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: var(--card); padding: 10px 15px; border-radius: 14px; border: 1px solid var(--border); }
+        .edit-toggle-btn { background: var(--border); color: var(--secondary); border: none; padding: 8px 14px; border-radius: 10px; font-weight: bold; font-size: 13px; cursor: pointer; transition: 0.2s; }
+        .edit-toggle-btn.active { background: var(--warning); color: #000; }
+
         .schedule-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
         .schedule-table th, .schedule-table td { border: 1px solid var(--border); text-align: center; padding: 6px 2px; }
         .schedule-table th { background: #1a1a1c; font-size: 11px; color: var(--secondary); }
@@ -26,7 +30,7 @@
         
         .name-col { text-align: left !important; padding-left: 10px !important; font-size: 13px; font-weight: bold; width: 85px; white-space: nowrap; }
         .cell-slot { height: 36px; cursor: pointer; font-size: 16px; vertical-align: middle; transition: background 0.1s; }
-        .cell-slot:active { background: #2c2c2e; }
+        .cell-slot.editable:active { background: #2c2c2e; }
         
         .status-check { color: var(--success); font-weight: bold; }
         .status-cross { color: var(--danger); font-weight: bold; }
@@ -66,17 +70,21 @@
         <button class="nav-btn" onclick="changeWeek(1)">❯</button>
     </div>
 
+    <!-- Szerkesztés Mód Sáv -->
+    <div class="toolbar">
+        <span style="font-size: 13px; color: var(--secondary);">Módosítás zárolva</span>
+        <button id="edit-btn" class="edit-toggle-btn" onclick="toggleEditMode()">✏️ Szerkesztés</button>
+    </div>
+
     <!-- Táblázat -->
     <div style="overflow-x: auto; flex-grow: 1;">
         <table class="schedule-table" id="schedule-table">
             <thead>
                 <tr id="table-header-row">
                     <th class="name-col">Név</th>
-                    <!-- Dinamikus napok jönnek ide -->
                 </tr>
             </thead>
             <tbody id="table-body">
-                <!-- Dinamikus dolgozók jönnek ide -->
             </tbody>
         </table>
     </div>
@@ -93,6 +101,7 @@
 
     let currentDate = new Date();
     let scheduleData = {};
+    let isEditMode = false;
 
     async function init() {
         await loadRemoteData();
@@ -115,6 +124,26 @@
         } catch(e) { console.log("Hálózati hiba mentéskor"); }
     }
 
+    function toggleEditMode() {
+        if (!isEditMode) {
+            if (confirm("Szerkeszted?")) {
+                isEditMode = true;
+            }
+        } else {
+            isEditMode = false;
+        }
+        
+        let btn = document.getElementById('edit-btn');
+        if (isEditMode) {
+            btn.classList.add('active');
+            btn.innerText = "🔓 Szerkesztve";
+        } else {
+            btn.classList.remove('active');
+            btn.innerText = "✏️ Szerkesztés";
+        }
+        render();
+    }
+
     function getWeekNumber(d) {
         d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
         d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay()||7));
@@ -122,7 +151,6 @@
         return Math.ceil((((d - yearStart) / 86400000) + 1)/7);
     }
 
-    // Aktuális hét hétfőjének lekérése
     function getMonday(d) {
         d = new Date(d);
         let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1);
@@ -147,30 +175,24 @@
 
         let days = getDaysOfCurrentWeek();
         
-        // Fejléc renderelése
         let headerHtml = '<th class="name-col">Név</th>';
         days.forEach((day, index) => {
             headerHtml += `<th><span class="day-header-name">${dayNames[index]}</span><span class="day-header-num">${day.getDate()}</span></th>`;
         });
         document.getElementById('table-header-row').innerHTML = headerHtml;
 
-        // Törzs renderelése
         let bodyHtml = "";
         
-        // 1. Csoport
         group1.forEach(name => {
             bodyHtml += renderEmployeeRow(name, days);
         });
 
-        // Elválasztó sáv
         bodyHtml += `<tr class="separator-row"><td colspan="8"></td></tr>`;
 
-        // 2. Csoport
         group2.forEach(name => {
             bodyHtml += renderEmployeeRow(name, days);
         });
 
-        // Összesítő sor
         bodyHtml += `<tr class="summary-row"><td class="name-col">Összesen</td>`;
         days.forEach(day => {
             let dateStr = formatDateKey(day);
@@ -197,7 +219,10 @@
             if(status === 'check') { symbol = '✓'; cls = 'status-check'; }
             else if(status === 'cross') { symbol = '✕'; cls = 'status-cross'; }
             
-            row += `<td class="cell-slot ${cls}" onmousedown="handlePress(event, '${name}', '${dateStr}')" ontouchstart="handleTouch(event, '${name}', '${dateStr}')">${symbol}</td>`;
+            let editableCls = isEditMode ? 'editable' : '';
+            let actionAttr = isEditMode ? `onmousedown="handlePress(event, '${name}', '${dateStr}')" ontouchstart="handleTouch(event, '${name}', '${dateStr}')"` : '';
+            
+            row += `<td class="cell-slot ${cls} ${editableCls}" ${actionAttr}>${symbol}</td>`;
         });
         row += `</tr>`;
         return row;
@@ -207,19 +232,18 @@
         return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
     }
 
-    // Mobil / Egér kezelés rövid és hosszú nyomáshoz
     let pressTimer = null;
     let isLongPress = false;
 
     function handlePress(e, name, dateStr) {
+        if(!isEditMode) return;
         if(e.type === 'mousedown' && e.button !== 0) return;
         isLongPress = false;
         pressTimer = setTimeout(() => {
             isLongPress = true;
             toggleStatus(name, dateStr, 'cross');
-        }, 500); // 500ms hosszú nyomás
+        }, 500);
         
-        // Egér elengedés figyelés rövid kattintáshoz
         window.addEventListener('mouseup', function mouseUpHandler() {
             clearTimeout(pressTimer);
             window.removeEventListener('mouseup', mouseUpHandler);
@@ -230,6 +254,7 @@
     }
 
     function handleTouch(e, name, dateStr) {
+        if(!isEditMode) return;
         isLongPress = false;
         pressTimer = setTimeout(() => {
             isLongPress = true;
@@ -241,7 +266,7 @@
             clearTimeout(pressTimer);
             target.removeEventListener('touchend', touchEndHandler);
             if(!isLongPress) {
-                ev.preventDefault(); // Dupla kattintás zoom elkerülése
+                ev.preventDefault();
                 toggleStatus(name, dateStr, 'check');
             }
         }, {once: true});
