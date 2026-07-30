@@ -71,7 +71,7 @@
 
     <!-- Szerkesztés Mód Sáv -->
     <div class="toolbar">
-        <span style="font-size: 13px; color: var(--secondary);">Módosítás zárolva</span>
+        <span style="font-size: 13px; color: var(--secondary);" id="edit-status-text">Módosítás zárolva</span>
         <button id="edit-btn" class="edit-toggle-btn" onclick="toggleEditMode()">✏️ Szerkesztés</button>
     </div>
 
@@ -127,12 +127,15 @@
     function toggleEditMode() {
         isEditMode = !isEditMode;
         let btn = document.getElementById('edit-btn');
+        let statusText = document.getElementById('edit-status-text');
         if (isEditMode) {
             btn.classList.add('active');
             btn.innerText = "🔓 Szerkesztve";
+            statusText.innerText = "Módosítás aktív";
         } else {
             btn.classList.remove('active');
             btn.innerText = "✏️ Szerkesztés";
+            statusText.innerText = "Módosítás zárolva";
         }
         render();
     }
@@ -230,11 +233,12 @@
 
     function handlePress(e, name, dateStr) {
         if(!isEditMode) return;
-        if(e.type === 'mousedown' && e.button !== 0) return;
+        if(e.button !== 0) return;
         isLongPress = false;
+        
         pressTimer = setTimeout(() => {
             isLongPress = true;
-            if (navigator.vibrate) navigator.vibrate(50); // Rezgés hosszú nyomásra
+            if (navigator.vibrate) navigator.vibrate(50);
             toggleStatus(name, dateStr, 'cross');
         }, 500);
         
@@ -250,16 +254,17 @@
     function handleTouch(e, name, dateStr) {
         if(!isEditMode) return;
         isLongPress = false;
+        
         pressTimer = setTimeout(() => {
             isLongPress = true;
-            if (navigator.vibrate) navigator.vibrate(50); // Rezgés hosszú nyomásra
+            if (navigator.vibrate) navigator.vibrate(50);
             toggleStatus(name, dateStr, 'cross');
         }, 500);
 
-        let target = e.target;
-        target.addEventListener('touchend', function touchEndHandler(ev) {
+        let cell = e.currentTarget;
+        cell.addEventListener('touchend', function touchEndHandler(ev) {
             clearTimeout(pressTimer);
-            target.removeEventListener('touchend', touchEndHandler);
+            cell.removeEventListener('touchend', touchEndHandler);
             if(!isLongPress) {
                 ev.preventDefault();
                 toggleStatus(name, dateStr, 'check');
