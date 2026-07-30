@@ -39,7 +39,6 @@
         .summary-row td { background: #18181a; font-weight: bold; font-size: 13px; color: var(--warning); }
 
         #loading-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: none; align-items: center; justify-content: center; color: white; font-weight: bold; }
-        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -104,6 +103,7 @@
     let isEditMode = false;
 
     async function init() {
+        currentDate = getMonday(currentDate);
         await loadRemoteData();
         render();
     }
@@ -125,14 +125,7 @@
     }
 
     function toggleEditMode() {
-        if (!isEditMode) {
-            if (confirm("Szerkeszted?")) {
-                isEditMode = true;
-            }
-        } else {
-            isEditMode = false;
-        }
-        
+        isEditMode = !isEditMode;
         let btn = document.getElementById('edit-btn');
         if (isEditMode) {
             btn.classList.add('active');
@@ -152,13 +145,13 @@
     }
 
     function getMonday(d) {
-        d = new Date(d);
-        let day = d.getDay(), diff = d.getDate() - day + (day == 0 ? -6:1);
-        return new Date(d.setDate(diff));
+        let date = new Date(d);
+        let day = date.getDay(), diff = date.getDate() - day + (day == 0 ? -6:1);
+        return new Date(date.setDate(diff));
     }
 
     function getDaysOfCurrentWeek() {
-        let monday = getMonday(currentDate);
+        let monday = new Date(currentDate);
         let days = [];
         for(let i = 0; i < 7; i++) {
             let nextDay = new Date(monday);
@@ -241,6 +234,7 @@
         isLongPress = false;
         pressTimer = setTimeout(() => {
             isLongPress = true;
+            if (navigator.vibrate) navigator.vibrate(50); // Rezgés hosszú nyomásra
             toggleStatus(name, dateStr, 'cross');
         }, 500);
         
@@ -258,6 +252,7 @@
         isLongPress = false;
         pressTimer = setTimeout(() => {
             isLongPress = true;
+            if (navigator.vibrate) navigator.vibrate(50); // Rezgés hosszú nyomásra
             toggleStatus(name, dateStr, 'cross');
         }, 500);
 
@@ -290,16 +285,19 @@
 
     function changeYear(n) {
         currentDate.setFullYear(currentDate.getFullYear() + n);
+        currentDate = getMonday(currentDate);
         render();
     }
 
     function changeMonth(n) {
         currentDate.setMonth(currentDate.getMonth() + n);
+        currentDate = getMonday(currentDate);
         render();
     }
 
     function changeWeek(n) {
         currentDate.setDate(currentDate.getDate() + (n * 7));
+        currentDate = getMonday(currentDate);
         render();
     }
 
