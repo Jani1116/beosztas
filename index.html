@@ -183,23 +183,23 @@
             bodyHtml += renderEmployeeRow(name, days);
         });
 
-        bodyHtml += `<tr class="separator-row"><td colspan="8"></td></tr>`;
-
-        group2.forEach(name => {
-            bodyHtml += renderEmployeeRow(name, days);
-        });
-
         bodyHtml += `<tr class="summary-row"><td class="name-col">Összesen</td>`;
         days.forEach(day => {
             let dateStr = formatDateKey(day);
             let count = 0;
-            [...group1, ...group2].forEach(name => {
+            group1.forEach(name => {
                 let key = `${name}_${dateStr}`;
                 if(scheduleData[key] === 'check') count++;
             });
             bodyHtml += `<td>${count > 0 ? count : ''}</td>`;
         });
         bodyHtml += `</tr>`;
+
+        bodyHtml += `<tr class="separator-row"><td colspan="8"></td></tr>`;
+
+        group2.forEach(name => {
+            bodyHtml += renderEmployeeRow(name, days);
+        });
 
         document.getElementById('table-body').innerHTML = bodyHtml;
     }
