@@ -1,4 +1,4 @@
-const CACHE_NAME = 'beosztas-pro-v3';
+const CACHE_NAME = 'beosztas-pro-v1';
 const ASSETS = [
   './index.html',
   './manifest.json',
